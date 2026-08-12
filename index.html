@@ -333,6 +333,7 @@ select.form-control{cursor:pointer}
 .memo-item-title{font-size:13.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .memo-item-snippet{font-size:12px;color:var(--text-soft);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .memo-item-date{font-size:11px;color:var(--text-dim);margin-top:5px}
+.memo-item-content{font-size:12.5px;color:var(--text-soft);margin-top:4px;line-height:1.7;max-height:140px;overflow:auto;white-space:pre-wrap;word-break:break-word}
 .memo-empty-list{color:var(--text-soft);font-size:13px;text-align:center;padding:30px 12px;line-height:1.8}
 .memo-editor-panel{min-height:calc(100vh - 180px);display:flex;flex-direction:column}
 .memo-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-soft);font-size:13.5px;text-align:center;line-height:1.9;gap:10px}
@@ -415,10 +416,9 @@ select.form-control{cursor:pointer}
             <textarea class="notebook-area" id="notebookArea" placeholder="把随时冒出来的想法、待跟进、灵感、会议要点都记在这里…&#10;&#10;内容会自动保存到本机，这是一本持续累积的记事簿，不会按天清空。"></textarea>
             <div class="notebook-foot">
               <div class="notebook-meta" id="noteMeta">0 字</div>
-              <div class="notebook-acts">
-                <button class="btn-outline" data-action="noteClear">清空</button>
-                <button class="btn-primary" data-action="noteToJournal">记入每日记事簿</button>
-              </div>
+            <div class="notebook-acts">
+              <button class="btn-outline" data-action="noteClear">清空</button>
+            </div>
             </div>
           </div>
         </div>
@@ -449,29 +449,20 @@ select.form-control{cursor:pointer}
       </div>
     </section>
 
-    <!-- ===== 页面：记事簿（每日 / 每周 / 每月） ===== -->
+    <!-- ===== 页面：记事簿（单一持续记录，不分时间） ===== -->
     <section class="page" id="page-timeline">
       <h1 class="page-title">记事簿</h1>
 
-      <div class="journal-tabs" id="journalTabs">
-        <button class="jtab active" data-action="journalTab" data-jt="daily">每日</button>
-        <button class="jtab" data-action="journalTab" data-jt="weekly">每周</button>
-        <button class="jtab" data-action="journalTab" data-jt="monthly">每月</button>
-      </div>
-
       <div class="panel section">
         <div class="panel-head">
-          <div class="panel-title"><span class="dot"></span><span id="journalLabel">——</span></div>
+          <div class="panel-title"><span class="dot"></span>记事簿</div>
           <div class="notebook-saved" id="journalSaved"><span class="dot"></span>本地已保存</div>
         </div>
         <div class="notebook">
-          <textarea class="notebook-area" id="journalArea" placeholder="把这一期（每日 / 每周 / 每月）的想法、待跟进、灵感、复盘都记在这里…&#10;&#10;内容自动保存到本机，可按「上一期 / 下一期」翻阅不同周期的记事。"></textarea>
+          <textarea class="notebook-area" id="journalArea" placeholder="把随时冒出来的想法、待跟进、灵感、会议要点都记在这里…&#10;&#10;内容会自动保存到本机。这是一本持续累积的记事簿，不分时间、不会按天清空。"></textarea>
           <div class="notebook-foot">
             <div class="notebook-meta" id="journalMeta">0 字</div>
             <div class="notebook-acts">
-              <button class="btn-outline" data-action="journalPrev" title="上一期">‹ 上一期</button>
-              <button class="btn-outline" data-action="journalToday">回到本期</button>
-              <button class="btn-outline" data-action="journalNext" title="下一期">下一期 ›</button>
               <button class="btn-primary" data-action="journalClear">清空</button>
             </div>
           </div>
@@ -682,8 +673,8 @@ function switchPage(key) {
   var navEl = document.querySelector('#nav .nav-item[data-page="' + key + '"]');
   if (navEl) navEl.classList.add('active');
   currentPage = key;
-  if (key === 'overview') { currentTodoDate = dateKey(); renderTodoOverview(); renderMemoOverview(); }
-  if (key === 'timeline') { loadJournal(); }
+  if (key === 'overview') { currentTodoDate = dateKey(); loadNote(); renderTodoOverview(); renderMemoOverview(); }
+  if (key === 'timeline') { loadNotePage(); }
   if (key === 'memo') { renderMemos(); }
   // 切换页面时把右侧内容区滚动到顶部
   var content = document.querySelector('.content');
@@ -754,9 +745,9 @@ function defaultDB(){ var td = dateKey(); var seed = {
   ],
   recurringDone:{},
   tracks:TRACKS,
-  updatedAt:Date.now(), journal:{daily:{},weekly:{},monthly:{}}, memos:[] }; }
+  updatedAt:Date.now(), memos:[] }; }
 function isShellDB(d){ if(!d||typeof d!=='object') return true; var p=(d.projects&&d.projects.length)||0; var m=(d.memos&&d.memos.length)||0; var t=(d.tracks&&d.tracks.length)||0; var td=d.todos||{}; var tdEmpty=true; for(var k in td){ if(td[k]&&td[k].length) tdEmpty=false; } return p===0 && m===0 && t===0 && tdEmpty; }
-function loadDB(){ var db; try{ var SEED_VER = window.__SEED_VERSION__ || '0'; var savedVer=''; try{ savedVer = localStorage.getItem('shiguang_db_ver')||''; }catch(e){} var s=localStorage.getItem('shiguang_db'); if(s){ db=JSON.parse(s); if(isShellDB(db) || savedVer !== SEED_VER) db=null; } if(!db && window.__SEED__){ db = JSON.parse(JSON.stringify(window.__SEED__)); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); localStorage.setItem('shiguang_db_ver', SEED_VER); }catch(e){} } }catch(e){} if(!db) db = defaultDB(); if(!db.notebook && db.notebook!=='') db.notebook=''; if(typeof db.notebook==='object' && db.notebook){ var nk=Object.keys(db.notebook); db.notebook = db.notebook[dateKey()] || db.notebook[nk[0]] || ''; } if(!db.todos) db.todos={}; if(Array.isArray(db.todos)){ var old=db.todos; db.todos={}; db.todos[dateKey()]=old; } if(!db.recurring) db.recurring=[]; if(!db.recurringDone) db.recurringDone={}; if(!db.journal) db.journal={}; if(!db.journal.daily) db.journal.daily={}; if(!db.journal.weekly) db.journal.weekly={}; if(!db.journal.monthly) db.journal.monthly={}; if(!db.memos) db.memos=[]; if(!db.settings) db.settings={}; if(!db.settings.ai) db.settings.ai={}; if(!db.settings.ai.key){ db.settings.ai=Object.assign({enabled:true,base:'https://open.bigmodel.cn/api/paas/v4',model:'glm-4-flash',key:'b2ad1a012ca44bdba03b7a7c2e838b23.iZsbmGS6rBPRJ33I'}, db.settings.ai); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); }catch(e){} } return db; }
+function loadDB(){ var db; try{ var SEED_VER = window.__SEED_VERSION__ || '0'; var savedVer=''; try{ savedVer = localStorage.getItem('shiguang_db_ver')||''; }catch(e){} var s=localStorage.getItem('shiguang_db'); if(s){ db=JSON.parse(s); if(isShellDB(db) || savedVer !== SEED_VER) db=null; } if(!db && window.__SEED__){ db = JSON.parse(JSON.stringify(window.__SEED__)); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); localStorage.setItem('shiguang_db_ver', SEED_VER); }catch(e){} } }catch(e){} if(!db) db = defaultDB(); if(!db.notebook && db.notebook!=='') db.notebook=''; if(typeof db.notebook==='object' && db.notebook){ var nk=Object.keys(db.notebook); db.notebook = db.notebook[dateKey()] || db.notebook[nk[0]] || ''; } if(!db.todos) db.todos={}; if(Array.isArray(db.todos)){ var old=db.todos; db.todos={}; db.todos[dateKey()]=old; } if(!db.recurring) db.recurring=[]; if(!db.recurringDone) db.recurringDone={}; if(!db.memos) db.memos=[]; if(!db.settings) db.settings={}; if(!db.settings.ai) db.settings.ai={}; if(!db.settings.ai.key){ db.settings.ai=Object.assign({enabled:true,base:'https://open.bigmodel.cn/api/paas/v4',model:'glm-4-flash',key:'b2ad1a012ca44bdba03b7a7c2e838b23.iZsbmGS6rBPRJ33I'}, db.settings.ai); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); }catch(e){} } return db; }
 function persistOnly(){ try{ localStorage.setItem('shiguang_db', JSON.stringify(DB)); }catch(e){} }
 // 检测本环境是否允许本地保存（部分浏览器以 file:// 打开时会静默禁用 localStorage）
 var LS_OK = (function(){ try{ var k='__ls_t__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
@@ -948,12 +939,12 @@ function renderMemoOverview() {
   var sorted = memos.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
   el.innerHTML = '<div class="memo-list">' + sorted.map(function (m) {
     var title = (m.title || '').trim() || '（无标题）';
-    var snippet = ((m.body || '').replace(/\s+/g, ' ').trim()).slice(0, 48) || '暂无内容';
+    var body = (m.body || '').trim() || '（暂无内容）';
     var d = m.updatedAt ? new Date(m.updatedAt) : null;
-    var dt = d ? (pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())) : '';
+    var dt = d ? (pad(d.getFullYear()) + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())) : '';
     return '<div class="memo-item" data-nav="memo">' +
       '<div class="memo-item-title">' + escapeHtml(title) + '</div>' +
-      '<div class="memo-item-snippet">' + escapeHtml(snippet) + '</div>' +
+      '<div class="memo-item-content">' + escapeHtml(body).replace(/\n/g, '<br>') + '</div>' +
       '<div class="memo-item-date">' + dt + '</div>' +
       '</div>';
   }).join('') + '</div>';
@@ -986,92 +977,42 @@ if (noteArea) {
   });
 }
 
-// ---------- 记事簿（每日 / 每周 / 每月） ----------
+// ---------- 记事簿（单一持续记录，不分时间） ----------
 var journalArea = document.getElementById('journalArea');
-var journalLabelEl = document.getElementById('journalLabel');
 var journalMetaEl = document.getElementById('journalMeta');
 var journalSavedEl = document.getElementById('journalSaved');
-var currentJTab = 'daily';
-var jOffset = 0; // 周期偏移：0=本期，-1=上一期，+1=下一期
-function mondayOf(d) {
-  var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  var day = (x.getDay() + 6) % 7; // 周一=0
-  x.setDate(x.getDate() - day);
-  return x;
-}
-function journalBaseDate() {
-  var d = new Date();
-  if (currentJTab === 'daily') d.setDate(d.getDate() + jOffset);
-  else if (currentJTab === 'weekly') d.setDate(d.getDate() + jOffset * 7);
-  else if (currentJTab === 'monthly') d.setMonth(d.getMonth() + jOffset);
-  return d;
-}
-function journalKey(d) {
-  if (currentJTab === 'daily') return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-  if (currentJTab === 'weekly') { var m = mondayOf(d); return m.getFullYear() + '-' + (m.getMonth() + 1) + '-' + m.getDate() + 'wk'; }
-  return d.getFullYear() + '-' + (d.getMonth() + 1);
-}
-function journalLabel(d) {
-  if (currentJTab === 'daily') return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WEEK_CN[d.getDay()];
-  if (currentJTab === 'weekly') {
-    var m = mondayOf(d);
-    var su = new Date(m); su.setDate(su.getDate() + 6);
-    var onejan = new Date(m.getFullYear(), 0, 1);
-    var wk = Math.floor((Math.round((m - onejan) / 86400000) + ((onejan.getDay() + 6) % 7)) / 7) + 1;
-    return m.getFullYear() + '年 第' + wk + '周（' + (m.getMonth() + 1) + '月' + m.getDate() + '日 ~ ' + (su.getMonth() + 1) + '月' + su.getDate() + '日）';
-  }
-  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月';
-}
-function loadJournal() {
+function loadNotePage() {
   if (!journalArea) return;
-  if (!DB.journal) DB.journal = { daily:{}, weekly:{}, monthly:{} };
-  if (!DB.journal[currentJTab]) DB.journal[currentJTab] = {};
-  var d = journalBaseDate();
-  var key = journalKey(d);
-  journalArea.value = DB.journal[currentJTab][key] || '';
-  journalLabelEl.textContent = journalLabel(d);
+  if (typeof DB.notebook !== 'string') DB.notebook = '';
+  journalArea.value = DB.notebook;
   journalMetaEl.textContent = journalArea.value.length + ' 字';
   journalSavedEl.innerHTML = '<span class="dot"></span>本地已保存';
 }
-function saveJournal() {
+function saveNotePage() {
   if (!journalArea) return;
-  if (!DB.journal) DB.journal = { daily:{}, weekly:{}, monthly:{} };
-  if (!DB.journal[currentJTab]) DB.journal[currentJTab] = {};
-  var d = journalBaseDate();
-  var key = journalKey(d);
-  DB.journal[currentJTab][key] = journalArea.value;
+  if (typeof DB.notebook !== 'string') DB.notebook = '';
+  DB.notebook = journalArea.value;
   saveLS();
   var t = new Date();
   journalSavedEl.innerHTML = '<span class="dot"></span>已保存 ' + pad(t.getHours()) + ':' + pad(t.getMinutes());
   journalMetaEl.textContent = journalArea.value.length + ' 字';
 }
-function journalShift(delta) { jOffset += delta; loadJournal(); }
-function journalBackToNow() { jOffset = 0; loadJournal(); }
-function switchJTab(tab) {
-  currentJTab = tab; jOffset = 0;
-  var tabs = document.querySelectorAll('#journalTabs .jtab');
-  for (var i = 0; i < tabs.length; i++) { tabs[i].classList.toggle('active', tabs[i].getAttribute('data-jt') === tab); }
-  loadJournal();
-}
 function journalClear() {
   if (!journalArea) return;
-  if (!confirm('确定清空当前这一期的记事内容？此操作不可撤销。')) return;
-  if (!DB.journal) DB.journal = { daily:{}, weekly:{}, monthly:{} };
-  if (!DB.journal[currentJTab]) DB.journal[currentJTab] = {};
-  var d = journalBaseDate();
-  var key = journalKey(d);
-  delete DB.journal[currentJTab][key];
+  if (!confirm('确定清空记事簿？此操作不可撤销。')) return;
+  if (typeof DB.notebook !== 'string') DB.notebook = '';
+  DB.notebook = '';
   journalArea.value = '';
   saveLS();
   journalMetaEl.textContent = '0 字';
   journalSavedEl.innerHTML = '<span class="dot"></span>已清空';
-  showToast('已清空本期记事');
+  showToast('记事簿已清空');
 }
 var journalSaveTimer = null;
 if (journalArea) {
   journalArea.addEventListener('input', function () {
     if (journalSaveTimer) clearTimeout(journalSaveTimer);
-    journalSaveTimer = setTimeout(saveJournal, 400);
+    journalSaveTimer = setTimeout(saveNotePage, 400);
   });
 }
 
@@ -1213,16 +1154,6 @@ function collectWorkData(){
   }
   if(DB.recurring && DB.recurring.length){
     parts.push('【每日固定待办】\n'+DB.recurring.map(function(r){ return '· '+(r.text||''); }).join('\n'));
-  }
-  if(DB.journal){
-    ['daily','weekly','monthly'].forEach(function(k){
-      var o=DB.journal[k]||{}; var keys=Object.keys(o);
-      if(keys.length){
-        var label=k==='daily'?'每日记事':k==='weekly'?'每周记事':'每月记事';
-        var txt=keys.map(function(dk){ return dk+'：\n'+(o[dk]||''); }).join('\n\n');
-        parts.push('【'+label+'】\n'+txt);
-      }
-    });
   }
   if(DB.projects && DB.projects.length){
     var pt=DB.projects.map(function(p){
@@ -1446,16 +1377,10 @@ function renderAI(){
     if(DB.notebook && DB.notebook.trim()){
       nb += '📝 随手记\n'+DB.notebook.trim()+'\n\n';
     }
-    // 记事簿（日/周/月）
-    ['daily','weekly','monthly'].forEach(function(k){
-      var o = (DB.journal && DB.journal[k]) || {};
-      var labels = {daily:'📅 每日记事', weekly:'📆 每周记事', monthly:'📊 每月记事'};
-      for(var d in o){
-        if(o.hasOwnProperty(d) && o[d] && String(o[d]).trim()){
-          nb += labels[k]+'（'+d+'）\n'+String(o[d]).trim()+'\n\n';
-        }
-      }
-    });
+    // 记事簿（单一持续记录）
+    if (DB.notebook && DB.notebook.trim()) {
+      nb += '📝 记事簿\n' + DB.notebook.trim() + '\n\n';
+    }
     nbEl.textContent = nb.trim() || '还没有记事内容，去「记事簿」或首页随手记写点什么…';
   }
   // --- 洞察建议区 ---
@@ -1468,10 +1393,6 @@ function renderAI(){
   // 最佳时段
   var hours={};
   dayTodos.forEach(function(t){ if(t.time){ var h=parseInt(String(t.time).split(':')[0],10); if(!isNaN(h)) hours[h]=(hours[h]||0)+1; } });
-  ['daily','weekly','monthly'].forEach(function(k){
-    var o=(DB.journal&&DB.journal[k])||{};
-    for(var d in o){ if(o.hasOwnProperty(d)&&o[d]){ String(o[d]).split('\n').forEach(function(line){ var m=/^(\d{1,2}):\d{2}/.exec(line.trim()); if(m){var h=+m[1];hours[h]=(hours[h]||0)+1;} }); } }
-  });
   var bestH=-1,bestC=0;for(var k in hours){if(hours[k]>bestC){bestC=hours[k];bestH=+k;}}
   var bestStr=bestH>=0?(pad(bestH)+':00 - '+pad(bestH+2)+':00'):'—';
   var ins=[];
@@ -1578,7 +1499,7 @@ function memoAutoSave(){
   if(memoSaveTimer) clearTimeout(memoSaveTimer);
   memoSaveTimer = setTimeout(saveMemoNow, 600);
 }
-function applyAll() { renderTodos(); renderTodoOverview(); renderTimelines(); renderMeetings(); renderProjects(); renderPomodoros(); renderAI(); selectReport(currentReportTab); initSettings(); loadNote(); loadJournal(); renderMemos(); renderMemoOverview(); }
+function applyAll() { renderTodos(); renderTodoOverview(); renderTimelines(); renderMeetings(); renderProjects(); renderPomodoros(); renderAI(); selectReport(currentReportTab); initSettings(); loadNote(); loadNotePage(); renderMemos(); renderMemoOverview(); }
 
 // ---------- 番茄钟 ----------
 var pomoTimer = null, pomoSeconds = 1500;
@@ -1900,27 +1821,6 @@ document.addEventListener('click', function (e) {
         saveNote();
         showToast('记事本已清空');
       }
-    } else if (a === 'noteToJournal') {
-      var v = noteArea.value.trim();
-      if (!v) { noteArea.focus(); showToast('记事本还是空的'); return; }
-      var now = new Date();
-      var hh = pad(now.getHours()), mm = pad(now.getMinutes());
-      var dk = dateKey();
-      var cur = DB.journal.daily[dk] || '';
-      if (cur.indexOf(v) !== -1) { showToast('今日记事簿已包含此内容'); return; }
-      DB.journal.daily[dk] = (cur ? cur + '\n' : '') + hh + ':' + mm + ' ' + v;
-      saveLS();
-      if (currentJTab === 'daily' && jOffset === 0) loadJournal();
-      showToast('已记入今日记事簿');
-    } else if (a === 'journalTab') {
-      var jt = target.getAttribute('data-jt');
-      if (jt) switchJTab(jt);
-    } else if (a === 'journalPrev') {
-      journalShift(-1);
-    } else if (a === 'journalNext') {
-      journalShift(1);
-    } else if (a === 'journalToday') {
-      journalBackToNow();
     } else if (a === 'journalClear') {
       journalClear();
     } else if (a === 'saveFile') {
