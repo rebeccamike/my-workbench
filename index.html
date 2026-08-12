@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
   <script>window.__SEED__={"notebook":"","todos":{"2026-7-30":[]},"settings":{"autoRecord":true,"localOnly":true,"ai":{"enabled":false,"base":"https://open.bigmodel.cn/api/paas/v4","model":"glm-4-flash","key":"b2ad1a012ca44bdba03b7a7c2e838b23.iZsbmGS6rBPRJ33I","status":"连接成功 ✓ · glm-4-flash"}},"meetings":[],"projects":[{"id":1785488990699,"tasks":[],"name":"奇云互娱","status":"进行中","note":"用户画像：hpv女性用户，45岁以上，迁移到账数据2000的用户。已群发欢迎语 差预热话术和上课。\n\n已创建分销商链接。等待课程预热 开始上课"},{"id":1785420540622,"tasks":[],"name":"短视频存量","status":"进行中","note":"1：CPA正常引流\n2：正常跟随大健康上智能录播"}],"pomodoros":[{"id":301,"label":"阅读 PRD 文档","type":"learn","mins":25},{"id":302,"label":"修复消息 Bug","type":"work","mins":25},{"id":303,"label":"看板首页 UI","type":"work","mins":25},{"id":304,"label":"☕ 5 分钟休息","type":"break","mins":5}],"pomoFocus":"写周报初稿","tracks":[{"t":"15:39","dur":"15:40","title":"Webxlin","tag":"dev","meta":"Webxlin · 其他工作 · 不止 1 分钟","detail":"使用 Webxlin 快速搭建前端组件库原型，验证了 4 个基础组件的可用性。后续需补充单元测试。"},{"t":"15:37","dur":"15:37","title":"LRR 经营工作台","tag":"work","meta":"Electron · 其他工作 · 不止 1 分钟","detail":"修复了托盘图标在 Windows 下不显示的问题，调整了窗口最小尺寸限制。"},{"t":"15:37","dur":"15:38","title":"使用 Codex 梳理《ChatGPT》工作","tag":"learn","meta":"Codex · 开发工作 · 不止 1 分钟","detail":"利用 Codex 辅助生成 API 文档，梳理了 12 个核心接口的入参和返回格式。"},{"t":"15:31","dur":"15:35","title":"使用 Codex 梳理《ChatGPT》工作","tag":"learn","meta":"Codex · 开发工作 · 3 分钟","detail":"继续完善 API 文档，补充了错误码定义和示例响应。"},{"t":"15:26","dur":"15:30","title":"拾光 · 日报排版与封面调优","tag":"work","meta":"拾光 Web · 设计 · 4 分钟","detail":"调整了日报卡片的圆角和阴影参数，封面模板新增了 3 个配色方案。"},{"t":"15:12","dur":"15:25","title":"和客户视频对齐方案","tag":"life","meta":"腾讯会议 · 沟通 · 13 分钟","detail":"确认了 Q3 第一批需求的范围，客户确认了报价并承诺本周五前提供补充材料。"},{"t":"14:50","dur":"15:10","title":"阅读《Deep Work》第 4 章","tag":"learn","meta":"微信读书 · 阅读 · 20 分钟","detail":"学习了\"深度工作\"的四个执行规则，准备在下周试行\"固定时段不处理消息\"的方法。"}],"recurring":[{"id":1785418429068,"text":"引流数据更新","prio":"mid","est":"","time":""},{"id":1785418439212,"text":"引流话术发送","prio":"mid","est":"","time":""}],"recurringDone":{"2026-7-30":{},"2026-7-31":{"1785418429068":false,"1785420493117":true},"2026-8-1":{},"2026-8-7":{},"2026-8-12":{}},"journal":{"daily":{"2026-8-1":""},"weekly":{},"monthly":{}},"updatedAt":1786178758081,"memos":[{"id":1785571255047,"title":"企业微信数据管理","body":"\n\n\n千尺银铃有3000用户 在马瑞微信可以引流电商课\n\n奇云互娱 有2000用户 在马瑞微信上正在上电商课\n","updatedAt":1786178758081}]};window.__SEED_VERSION__='20260812d';</script>
+  <script>window.__SEED_VERSION__='20260812d';</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>我的工作台</title>
@@ -341,7 +342,7 @@ select.form-control{cursor:pointer}
 .memo-body{flex:1;width:100%;min-height:340px;resize:vertical;line-height:1.8;font-size:14px;font-family:inherit;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text);outline:none;box-sizing:border-box}
 .memo-saved{color:var(--primary);font-size:12.5px;margin-top:8px;text-align:right}
 </style>
-<!-- deploy-20260812d --></head>
+</head>
 <body>
 <div class="toast" id="toast"></div>
 <div class="app">
@@ -570,7 +571,7 @@ select.form-control{cursor:pointer}
         <span class="saved-hint" id="configSaved">✓ 配置已保存</span>
       </div>
       <div class="panel section">
-        <div class="panel-head"><div class="panel-title"><span class="dot"></span>数据管理 · 云同步</div></div>
+        <div class="panel-head"><div class="panel-title"><span class="dot"></span>数据管理 · 本地备份</div></div>
         <div class="setting-group">
           <div class="setting-desc" style="margin-bottom:12px;line-height:1.7">本工作台是纯前端单文件应用，数据默认仅存于本机浏览器。点击「保存到文件」会生成一个已内嵌你全部数据的新 HTML——把它拷到任意电脑、双击即用，无需联网、无需安装。也可用 JSON 做轻量备份。</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -582,28 +583,6 @@ select.form-control{cursor:pointer}
           </div>
           <div class="setting-desc" style="margin-top:8px;line-height:1.6">如果打开后看不到数据，或本机数据损坏，点「恢复内置备份数据」可强制用回内置的备份内容（即你之前发给我的那份最新数据）。恢复前如有新内容请先「导出 JSON」备份。</div>
           <input type="file" id="importInput" accept="application/json" style="display:none"/>
-        </div>
-      </div>
-      <div class="panel section">
-        <div class="panel-head"><div class="panel-title"><span class="dot"></span>云端同步（实时）</div></div>
-        <div class="setting-group">
-          <div class="setting-row">
-            <div><div class="setting-label">启用云端实时同步</div><div class="setting-desc">开启后，每次修改自动上传到云端；打开页面自动拉取，多台电脑数据实时一致。</div></div>
-            <div class="toggle" data-action="cloudToggle"></div>
-          </div>
-          <div class="cloud-fields" id="cloudFields" style="display:none">
-            <div class="form-row"><label>Gist ID（私密）</label><input class="form-control" id="cloudBin" placeholder="例如 4c8e1f2a9b3d..."></div>
-            <div class="form-row"><label>GitHub Token（需 gist 权限）</label><input class="form-control" id="cloudKey" type="password" placeholder="ghp_xxxxxxxxxxxx"></div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-              <button class="btn-outline" style="font-size:12px" data-action="cloudTest">测试连接</button>
-              <button class="btn-primary" style="font-size:12px" data-action="cloudPush">立即上传</button>
-              <button class="btn-outline" style="font-size:12px" data-action="cloudPull">从云端拉取</button>
-              <button class="btn-outline" style="font-size:12px" data-action="cloudCreate">新建 Gist（自动填 ID）</button>
-            </div>
-            <div class="cloud-status" id="cloudStatus" style="margin-top:10px">未同步</div>
-            <div class="cloud-status" id="cloudLast"></div>
-            <div class="setting-desc" style="margin-top:10px;line-height:1.7">使用 GitHub 私密 Gist 做多端同步：① 在 GitHub → Settings → Developer settings → Personal access tokens → 生成 <b>classic token</b>，勾选 <b>gist</b> 权限；② 把 token 填上方，点「新建 Gist」会自动创建私密 Gist 并填好 ID；③ 开启同步即可。数据存在你自己的私密 Gist，仅你可读写，换电脑打开同一链接即自动同步。注意：Token 会以明文保存在本机/同步数据中，仅建议个人使用。</div>
-          </div>
         </div>
       </div>
       <div class="panel section">
