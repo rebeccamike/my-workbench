@@ -555,10 +555,10 @@ select.form-control{cursor:pointer}
         <div class="panel-head"><div class="panel-title"><span class="dot"></span>云端同步（实时）</div></div>
         <div class="setting-group">
           <div class="setting-row">
-            <div><div class="setting-label">启用云端实时同步</div><div class="setting-desc">开启后，每次修改自动上传到云端；打开页面每 60 秒自动拉取，手机与电脑数据实时一致。</div></div>
+            <div><div class="setting-label">启用云端实时同步</div><div class="setting-desc">开启后，每次修改自动上传到云端；打开页面每 20 秒自动拉取，手机与电脑数据实时一致。</div></div>
             <div class="toggle" data-action="cloudToggle"></div>
           </div>
-          <div class="cloud-fields" id="cloudFields" style="display:none">
+          <div class="cloud-fields" id="cloudFields">
             <div class="form-row"><label>接口地址（一般无需修改）</label><input class="form-control" id="cloudBase" placeholder="https://api.github.com/gists"></div>
             <div class="form-row"><label>Gist ID（私密）</label><input class="form-control" id="cloudBin" placeholder="例如 4c8e1f2a9b3d..."></div>
             <div class="form-row"><label>GitHub Token（需 gist 权限）</label><input class="form-control" id="cloudKey" type="password" placeholder="ghp_xxxxxxxxxxxx"></div>
@@ -750,7 +750,7 @@ function defaultDB(){ var td = dateKey(); var seed = {
   tracks:TRACKS,
   updatedAt:Date.now(), memos:[] }; }
 function isShellDB(d){ if(!d||typeof d!=='object') return true; var p=(d.projects&&d.projects.length)||0; var m=(d.memos&&d.memos.length)||0; var t=(d.tracks&&d.tracks.length)||0; var td=d.todos||{}; var tdEmpty=true; for(var k in td){ if(td[k]&&td[k].length) tdEmpty=false; } return p===0 && m===0 && t===0 && tdEmpty; }
-function loadDB(){ var db; try{ var SEED_VER = window.__SEED_VERSION__ || '0'; var savedVer=''; try{ savedVer = localStorage.getItem('shiguang_db_ver')||''; }catch(e){} var s=localStorage.getItem('shiguang_db'); if(s){ db=JSON.parse(s); if(isShellDB(db) || savedVer !== SEED_VER) db=null; } if(!db && window.__SEED__){ db = JSON.parse(JSON.stringify(window.__SEED__)); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); localStorage.setItem('shiguang_db_ver', SEED_VER); }catch(e){} } }catch(e){} if(!db) db = defaultDB(); if(!db.notebook && db.notebook!=='') db.notebook=''; if(typeof db.notebook==='object' && db.notebook){ var nk=Object.keys(db.notebook); db.notebook = db.notebook[dateKey()] || db.notebook[nk[0]] || ''; } if(!db.todos) db.todos={}; if(Array.isArray(db.todos)){ var old=db.todos; db.todos={}; db.todos[dateKey()]=old; } if(!db.recurring) db.recurring=[]; if(!db.recurringDone) db.recurringDone={}; if(!db.memos) db.memos=[]; if(!db.settings) db.settings={}; if(!db.settings.ai) db.settings.ai={}; if(!db.settings.ai.key){ db.settings.ai=Object.assign({enabled:true,base:'https://open.bigmodel.cn/api/paas/v4',model:'glm-4-flash',key:'b2ad1a012ca44bdba03b7a7c2e838b23.iZsbmGS6rBPRJ33I'}, db.settings.ai); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); }catch(e){} } return db; }
+function loadDB(){ var db; try{ var SEED_VER = window.__SEED_VERSION__ || '0'; var savedVer=''; try{ savedVer = localStorage.getItem('shiguang_db_ver')||''; }catch(e){} var s=localStorage.getItem('shiguang_db'); if(s){ db=JSON.parse(s); if(isShellDB(db) || savedVer !== SEED_VER) db=null; } if(!db && window.__SEED__){ db = JSON.parse(JSON.stringify(window.__SEED__)); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); localStorage.setItem('shiguang_db_ver', SEED_VER); }catch(e){} } }catch(e){} if(!db) db = defaultDB(); if(!db.notebook && db.notebook!=='') db.notebook=''; if(typeof db.notebook==='object' && db.notebook){ var nk=Object.keys(db.notebook); db.notebook = db.notebook[dateKey()] || db.notebook[nk[0]] || ''; } if(!db.todos) db.todos={}; if(Array.isArray(db.todos)){ var old=db.todos; db.todos={}; db.todos[dateKey()]=old; } if(!db.recurring) db.recurring=[]; if(!db.recurringDone) db.recurringDone={}; if(!db.memos) db.memos=[]; if(!db.settings) db.settings={}; if(!db.settings.cloud) db.settings.cloud={enabled:false,base:'https://api.github.com/gists',bin:'',key:'',lastSync:0,status:''}; if(!db.settings.ai) db.settings.ai={}; if(!db.settings.ai.key){ db.settings.ai=Object.assign({enabled:true,base:'https://open.bigmodel.cn/api/paas/v4',model:'glm-4-flash',key:'b2ad1a012ca44bdba03b7a7c2e838b23.iZsbmGS6rBPRJ33I'}, db.settings.ai); try{ localStorage.setItem('shiguang_db', JSON.stringify(db)); }catch(e){} } return db; }
 function persistOnly(){ try{ localStorage.setItem('shiguang_db', JSON.stringify(DB)); }catch(e){} }
 // 检测本环境是否允许本地保存（部分浏览器以 file:// 打开时会静默禁用 localStorage）
 var LS_OK = (function(){ try{ var k='__ls_t__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
@@ -1030,7 +1030,7 @@ function initSettings() {
   var c=DB.settings.cloud;
   var ct=document.querySelector('.toggle[data-action="cloudToggle"]');
   if(ct){ if(c.enabled) ct.classList.add('on'); else ct.classList.remove('on'); }
-  var cf=document.getElementById('cloudFields'); if(cf) cf.style.display=c.enabled?'block':'none';
+  var cf=document.getElementById('cloudFields'); if(cf) cf.style.display='block';
   var bEl=document.getElementById('cloudBase'); if(bEl) bEl.value=c.base||'';
   var binEl=document.getElementById('cloudBin'); if(binEl) binEl.value=c.bin||'';
   var keyEl=document.getElementById('cloudKey'); if(keyEl) keyEl.value=c.key||'';
@@ -1102,7 +1102,7 @@ function pullCloud(){
     })
     .catch(function(err){ setCloudStatus('拉取失败：'+(err&&err.message?err.message:err)); });
 }
-function startCloud(){ stopCloud(); if(DB.settings.cloud.enabled) cloudPullTimer=setInterval(pullCloud,60000); } // 60s 轮询，配合切回页面立即拉取，避免免费额度被刷爆
+function startCloud(){ stopCloud(); if(DB.settings.cloud.enabled) cloudPullTimer=setInterval(pullCloud,20000); } // 20s 轮询（认证额度内），配合切回页面立即拉取，手机/电脑近实时同步
 function stopCloud(){ if(cloudPullTimer){ clearInterval(cloudPullTimer); cloudPullTimer=null; } }
 function testCloud(){
   var c=readCloudForm();
@@ -1849,7 +1849,7 @@ document.addEventListener('click', function (e) {
       if (cg) cg.classList.toggle('on');
       var on = cg ? cg.classList.contains('on') : !DB.settings.cloud.enabled;
       DB.settings.cloud.enabled = on;
-      var cf2 = document.getElementById('cloudFields'); if (cf2) cf2.style.display = on ? 'block' : 'none';
+      var cf2 = document.getElementById('cloudFields'); if (cf2) cf2.style.display = 'block';
       saveLS();
       startCloud();
       var cs2 = document.getElementById('cloudStatus'); if (cs2) cs2.textContent = on ? '云端同步已开启' : '未同步';
@@ -1938,24 +1938,31 @@ if (importInput) {
   });
 }
 
-// 初始化
-applyAll();
-// 还原上次停留的页面（刷新后不再跳回首页）
-var sp = loadSavedPage();
-if (sp) switchPage(sp);
-// 云端同步：输入框监听仅绑定一次；开启且有凭据时首次拉取
-['cloudBase','cloudBin','cloudKey'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', function(){ readCloudForm(); persistOnly(); }); });
-['aiBase','aiModel','aiKey'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', function(){ readAIForm(); persistOnly(); }); });
-['memoTitle','memoBody'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', memoAutoSave); });
-if (!LS_OK) showLSWarn();
-if (DB.settings.cloud.enabled && DB.settings.cloud.bin && DB.settings.cloud.key) pullCloud();
-// 切回页面/标签页时立即拉取一次，配合 60s 轮询做到近实时、又省额度
-function cloudMaybePull(){ if(DB.settings.cloud.enabled && DB.settings.cloud.bin && DB.settings.cloud.key) pullCloud(); }
-window.addEventListener('focus', cloudMaybePull);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden) cloudMaybePull(); });
-updatePomo();
+// 时钟：最先启动，确保实时走字，不受后续初始化异常影响
 tickClock();
 setInterval(tickClock, 1000);
+
+// 其余初始化（包裹，避免单个模块异常阻断全局、冻住时钟）
+try {
+  applyAll();
+  // 还原上次停留的页面（刷新后不再跳回首页）
+  var sp = loadSavedPage();
+  if (sp) switchPage(sp);
+  // 云端同步：输入框监听仅绑定一次；开启且有凭据时首次拉取
+  ['cloudBase','cloudBin','cloudKey'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', function(){ readCloudForm(); persistOnly(); }); });
+  ['aiBase','aiModel','aiKey'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', function(){ readAIForm(); persistOnly(); }); });
+  ['memoTitle','memoBody'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', memoAutoSave); });
+  if (!LS_OK) showLSWarn();
+  if (DB.settings.cloud && DB.settings.cloud.enabled && DB.settings.cloud.bin && DB.settings.cloud.key) pullCloud();
+  // 切回页面/标签页时立即拉取一次，配合 60s 轮询做到近实时、又省额度
+  function cloudMaybePull(){ if(DB.settings.cloud && DB.settings.cloud.enabled && DB.settings.cloud.bin && DB.settings.cloud.key) pullCloud(); }
+  window.addEventListener('focus', cloudMaybePull);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) cloudMaybePull(); });
+  updatePomo();
+} catch (e) {
+  if (window.console) console.error('初始化部分失败：', e);
+  try { showToast('部分功能初始化失败，但页面可正常使用'); } catch (e2) {}
+}
 </script>
 </body>
 </html>
