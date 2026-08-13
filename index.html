@@ -551,8 +551,25 @@ select.form-control{cursor:pointer}
     <section class="page" id="page-settings">
       <h1 class="page-title">设置与隐私</h1>
       <div id="lsWarn" class="ls-warn" style="display:none">⚠ 当前浏览器环境（直接用本地文件打开）无法自动保存，刷新后内容会丢失。请改用线上链接，或用「保存到文件（跨设备）」导出一份含数据的新文件带走。</div>
+      <div class="panel section" id="roomPanel">
+        <div class="panel-head"><div class="panel-title"><span class="dot"></span>房间同步（推荐 · 免配置）</div></div>
+        <div class="setting-group">
+          <div class="setting-desc" style="margin-bottom:12px;line-height:1.7">① 把你的 GitHub Token 粘到下方（<b>只需这一次</b>，仅存本机浏览器，不会写进网页源码）；② 点「创建房间」生成私密同步空间；③ 把显示的<b>房间码</b>或扫码告诉手机，手机粘同一个 Token + 房间码即可加入。两端自动实时同步。</div>
+          <div class="form-row"><label>GitHub Token（需 gist 权限，粘一次即可）</label><input class="form-control" id="roomToken" type="password" placeholder="ghp_xxxxxxxxxxxx"></div>
+          <div id="roomView"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+            <button class="btn-primary" data-action="roomCreate" id="roomCreateBtn">➕ 创建房间</button>
+            <span id="roomJoinWrap" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input class="form-control" id="roomCodeInput" placeholder="输入房间码加入" style="max-width:200px">
+              <button class="btn-outline" data-action="roomJoin">加入</button>
+            </span>
+            <button class="btn-outline" data-action="roomLeave" id="roomLeaveBtn" style="display:none">退出房间</button>
+          </div>
+          <div id="roomStatus" class="cloud-status" style="margin-top:10px">未加入房间</div>
+        </div>
+      </div>
       <div class="panel section">
-        <div class="panel-head"><div class="panel-title"><span class="dot"></span>云端同步（实时）</div></div>
+        <div class="panel-head"><div class="panel-title"><span class="dot"></span>云端同步（高级 · 手动配置 GitHub）</div></div>
         <div class="setting-group">
           <div class="setting-row">
             <div><div class="setting-label">启用云端实时同步</div><div class="setting-desc">开启后，每次修改自动上传到云端；打开页面每 20 秒自动拉取，手机与电脑数据实时一致。</div></div>
@@ -1051,6 +1068,96 @@ function initSettings() {
 // ---------- 云端实时同步（JSONBin 风格，可配置 base） ----------
 var cloudPullTimer=null;
 var GIST_BASE='https://api.github.com/gists';
+
+// ===== 房间同步（免 GitHub 配置，推荐）=====
+// 房间基于 GitHub 私密 Gist。GitHub 的推送安全机制禁止在公开页面内嵌任何 Token，
+// 因此房间使用你自己的 Token：粘到房间里的输入框即可，仅存本机浏览器，不会写进网页源码。
+// 你的 Token 只需 gist 权限，可与“高级同步”共用同一个。
+function getRoomToken(){ var el=document.getElementById('roomToken'); var v=el?el.value.trim():''; if(v) return v; return (DB.settings.cloud && DB.settings.cloud.key)||''; }
+function setRoomToken(t){ if(DB.settings.cloud) DB.settings.cloud.key=t; var el=document.getElementById('roomToken'); if(el) el.value=t; persistOnly(); }
+function roomAuthH(){ return { 'Content-Type':'application/json','Accept':'application/vnd.github+json','Authorization':'Bearer '+getRoomToken() }; }
+
+function normalizeRoomCode(code){ return (code||'').trim().toLowerCase().replace(/[^a-z0-9]/g,''); }
+function roomGistUrl(id){ return GIST_BASE + '/' + id; }
+function setRoomStatus(msg){ var el=document.getElementById('roomStatus'); if(el) el.textContent=msg; }
+
+function roomActivate(id, tk){
+  var c=DB.settings.cloud;
+  c.key = tk; c.base = GIST_BASE; c.bin = id; c.enabled = true;
+  DB.settings.room = { id:id };
+  persistOnly(); startCloud(); pullCloud(); renderRoom();
+}
+
+function createRoom(){
+  var tk=getRoomToken();
+  if(!tk){ setRoomStatus('请先在上方粘贴你的 GitHub Token（只需一次）'); showToast('请先粘贴 GitHub Token'); return; }
+  setRoomToken(tk);
+  setRoomStatus('正在创建房间…');
+  var body = { description:'我的工作台同步房间', public:false, files:{ 'workbench.json':{ content: JSON.stringify(DB) } } };
+  fetch(GIST_BASE, { method:'POST', headers:roomAuthH(), body:JSON.stringify(body) })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d){ roomActivate(d.id, tk); setRoomStatus('房间已创建 ✓ 用下方房间码或扫码让手机加入'); showToast('房间已创建'); })
+    .catch(function(err){ setRoomStatus('创建失败：'+(err&&err.message?err.message:err)); showToast('创建失败'); });
+}
+
+function joinRoom(code){
+  var id = normalizeRoomCode(code);
+  if(!id){ setRoomStatus('请输入有效的房间码'); return; }
+  var tk=getRoomToken();
+  if(!tk){ setRoomStatus('请先在上方粘贴你的 GitHub Token（只需一次）'); showToast('请先粘贴 GitHub Token'); return; }
+  setRoomToken(tk);
+  setRoomStatus('正在连接房间…');
+  fetch(roomGistUrl(id), { headers:roomAuthH() })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(){ roomActivate(id, tk); setRoomStatus('已加入房间 ✓'); showToast('已加入房间'); })
+    .catch(function(err){ setRoomStatus('加入失败（房间码无效或网络异常）：'+(err&&err.message?err.message:err)); showToast('加入失败'); });
+}
+
+function leaveRoom(){
+  stopCloud();
+  var c=DB.settings.cloud; c.enabled=false; c.bin=''; c.key='';
+  DB.settings.room=null;
+  persistOnly(); renderRoom(); setRoomStatus('已退出房间');
+}
+
+function renderRoom(){
+  var id = DB.settings.room && DB.settings.room.id;
+  var rt=document.getElementById('roomToken'); if(rt && !rt.value && DB.settings.cloud && DB.settings.cloud.key) rt.value=DB.settings.cloud.key;
+  var view=document.getElementById('roomView');
+  var cb=document.getElementById('roomCreateBtn');
+  var jw=document.getElementById('roomJoinWrap');
+  var lb=document.getElementById('roomLeaveBtn');
+  if(id){
+    var grouped=id.replace(/(.{4})/g,'$1 ').trim().toUpperCase();
+    var url=location.origin+location.pathname+'?room='+id;
+    var qr='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url);
+    if(view) view.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">'+
+      '<div style="text-align:center"><div style="font-size:12px;color:#888;margin-bottom:4px">手机扫码加入</div><img src="'+qr+'" style="width:150px;height:150px;border:1px solid #ddd;border-radius:8px" onerror="this.style.display=\'none\'"></div>'+
+      '<div><div style="font-size:12px;color:#888;margin-bottom:4px">房间码（也可手动输入）</div><div style="font-family:monospace;font-size:15px;letter-spacing:2px;background:#f5f5f5;padding:8px 12px;border-radius:6px">'+grouped+'</div></div></div>';
+    if(cb) cb.style.display='none';
+    if(jw) jw.style.display='none';
+    if(lb) lb.style.display='inline-block';
+  } else {
+    if(view) view.innerHTML='';
+    if(cb) cb.style.display='inline-block';
+    if(jw) jw.style.display='flex';
+    if(lb) lb.style.display='none';
+  }
+}
+
+function roomBoot(){
+  try {
+    var params=new URLSearchParams(location.search);
+    var rq=params.get('room');
+    if(rq && !(DB.settings.room && DB.settings.room.id)){ joinRoom(rq); return; }
+  } catch(e){}
+  if(DB.settings.room && DB.settings.room.id){
+    var c=DB.settings.cloud;
+    c.base=GIST_BASE; c.bin=DB.settings.room.id; c.enabled=true;
+    startCloud();
+  }
+  renderRoom();
+}
 function gistHeaders(){ var c=DB.settings.cloud; var h={'Content-Type':'application/json','Accept':'application/vnd.github+json'}; if(c.key) h['Authorization']='Bearer '+c.key; return h; }
 function fmtTime(ts){ var d=new Date(ts); function p(n){ return (n<10?'0':'')+n; } return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
 function fmtNow(){ return fmtTime(Date.now()); }
@@ -1869,6 +1976,12 @@ document.addEventListener('click', function (e) {
       else pullCloud();
     } else if (a === 'cloudCreate') {
       createGist();
+    } else if (a === 'roomCreate') {
+      createRoom();
+    } else if (a === 'roomJoin') {
+      var rc=document.getElementById('roomCodeInput'); joinRoom(rc?rc.value:'');
+    } else if (a === 'roomLeave') {
+      leaveRoom();
     } else if (a === 'aiToggle') {
       var atg = document.querySelector('.toggle[data-action="aiToggle"]');
       if (atg) atg.classList.toggle('on');
@@ -1944,6 +2057,7 @@ setInterval(tickClock, 1000);
 
 // 其余初始化（包裹，避免单个模块异常阻断全局、冻住时钟）
 try {
+  roomBoot();
   applyAll();
   // 还原上次停留的页面（刷新后不再跳回首页）
   var sp = loadSavedPage();
