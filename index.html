@@ -563,8 +563,8 @@ select.form-control{cursor:pointer}
       <div class="panel section" id="roomPanel">
         <div class="panel-head"><div class="panel-title"><span class="dot"></span>房间同步（推荐 · 免配置）</div></div>
         <div class="setting-group">
-          <div class="setting-desc" style="margin-bottom:12px;line-height:1.7">① 把你的 GitHub Token 粘到下方（<b>只需这一次</b>，仅存本机浏览器，不会写进网页源码）；② 点「创建房间」生成私密同步空间；③ 把显示的<b>房间码</b>或扫码告诉手机，手机粘同一个 Token + 房间码即可加入。两端自动实时同步。</div>
-          <div class="form-row"><label>GitHub Token（需 gist 权限，粘一次即可）</label><input class="form-control" id="roomToken" type="password" placeholder="ghp_xxxxxxxxxxxx"></div>
+          <div class="setting-desc" style="margin-bottom:12px;line-height:1.7">① 在<b>电脑端</b>把你的 GitHub Token 粘到下方（<b>只需这一次</b>，仅存本机浏览器）；② 点「创建房间」生成私密同步空间；③ 用手机扫显示的二维码——<b>手机端无需输入任何内容</b>，会自动读取房间内容并直接可编辑，两端实时同步。Token 只用在电脑端，不会写进网页源码，手机扫码自动获取。</div>
+          <div class="form-row" id="roomTokenRow"><label>GitHub Token（需 gist 权限，电脑端粘一次即可）</label><input class="form-control" id="roomToken" type="password" placeholder="ghp_xxxxxxxxxxxx"></div>
           <div id="roomView"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
             <button class="btn-primary" data-action="roomCreate" id="roomCreateBtn">➕ 创建房间</button>
@@ -1114,15 +1114,43 @@ function joinRoom(code){
   if(!id){ setRoomStatus('请输入有效的房间码'); return; }
   joinRoomWith(id, getRoomToken());
 }
+function anonPull(id){
+  return fetch('https://api.github.com/gists/'+id, { headers:{'Accept':'application/vnd.github+json'} })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(data){
+      var file = data.files && data.files['workbench.json'];
+      if(!file || !file.content) throw new Error('房间暂无数据');
+      return JSON.parse(file.content);
+    });
+}
+// 匿名只读载入：手机扫码即可见内容，无需 Token（GitHub 私密 Gist 凭 ID 可匿名读取）
+function applyRemoteReadOnly(remote, id){
+  if(!remote || typeof remote!=='object') throw new Error('返回格式异常');
+  var keepCloud = DB.settings.cloud;
+  DB = remote;
+  if(!DB.settings) DB.settings={};
+  DB.settings.cloud = keepCloud;
+  DB.settings.room = { id:id, ro:true };
+  DB.updatedAt = remote.updatedAt || Date.now();
+  persistOnly(); applyAll();
+  setRoomStatus('已载入房间内容（只读 · 在下方粘贴 Token 后可编辑并双向同步）');
+  renderRoom(); updateSyncPill();
+}
 function joinRoomWith(id, tk){
   if(!id){ setRoomStatus('房间码无效'); return; }
-  if(!tk){ setRoomStatus('请先在上方粘贴你的 GitHub Token（只需一次）'); showToast('请先粘贴 GitHub Token'); return; }
-  setRoomToken(tk);
-  setRoomStatus('正在连接房间…');
-  fetch(roomGistUrl(id), { headers:roomAuthH() })
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(function(){ roomActivate(id, tk); try{ history.replaceState(null,'',location.pathname+'?room='+id); }catch(e){} setRoomStatus('已加入房间 ✓'); showToast('已加入房间'); })
-    .catch(function(err){ var m=(err&&err.message)?err.message:(''+err); if(/401/.test(m)){ renderRoomRepair(id); setRoomStatus('加入失败：Token 已失效，请在下方重新粘贴 Token 后加入'); } else { setRoomStatus('加入失败（房间码无效或网络异常）：'+m); } showToast('加入失败'); });
+  if(tk){
+    setRoomToken(tk);
+    setRoomStatus('正在连接房间…');
+    fetch(roomGistUrl(id), { headers:roomAuthH() })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(){ roomActivate(id, tk); try{ history.replaceState(null,'',location.pathname+'?room='+id); }catch(e){} setRoomStatus('已加入房间 ✓ 可双向同步'); showToast('已加入房间'); })
+      .catch(function(err){ var m=(err&&err.message)?err.message:(''+err); if(/401/.test(m)){ renderRoomRepair(id); setRoomStatus('Token 已失效，请在下方重新粘贴 Token 后加入'); } else { setRoomStatus('加入失败（房间码无效或网络异常）：'+m); } showToast('加入失败'); });
+  } else {
+    // 无 Token：匿名读取，扫码即可见内容（只读）
+    setRoomStatus('正在载入房间内容…');
+    anonPull(id).then(function(remote){ applyRemoteReadOnly(remote, id); })
+      .catch(function(err){ setRoomStatus('载入失败：'+(err&&err.message?err.message:err)); });
+  }
 }
 
 function leaveRoom(){
@@ -1158,11 +1186,18 @@ function renderRoom(){
     if(cb) cb.style.display='none';
     if(jw) jw.style.display='none';
     if(lb) lb.style.display='inline-block';
+    // 加入房间后隐藏 Token 输入框；仅只读模式（无 Token）下显示，方便粘 Token 开启编辑同步
+    var tr=document.getElementById('roomTokenRow');
+    var rt=document.getElementById('roomToken');
+    var ro = DB.settings.room && DB.settings.room.ro;
+    if(tr) tr.style.display = ro ? '' : 'none';
+    if(rt){ if(ro){ rt.onchange=function(){ var v=(rt.value||'').trim(); if(v) joinRoomWith(id, v); }; } else { rt.onchange=null; } }
   } else {
     if(view) view.innerHTML='';
     if(cb) cb.style.display='inline-block';
     if(jw) jw.style.display='flex';
     if(lb) lb.style.display='none';
+    var tr2=document.getElementById('roomTokenRow'); if(tr2) tr2.style.display='';
   }
   updateSyncPill();
 }
@@ -1176,7 +1211,8 @@ function updateSyncPill(){
     if(c.lastSync){ el.textContent='已同步 ✓'; pill.classList.add('ok'); }
     else { el.textContent='同步中…'; pill.classList.add('syncing'); }
   } else if(room && room.id){
-    el.textContent='需连接'; pill.classList.add('err');
+    if(room.ro){ el.textContent='只读（扫码查看）'; pill.classList.add('err'); }
+    else { el.textContent='需连接'; pill.classList.add('err'); }
   } else {
     el.textContent='本地模式';
   }
@@ -1202,8 +1238,18 @@ function roomBoot(){
     var rq=params.get('room');
     var htk=params.get('tk')||''; // 优先读查询参数（多数扫码 APP 不会丢）
     if(!htk){ var hm=new URLSearchParams((location.hash||'').replace(/^#/,'')); htk=hm.get('tk')||''; }
-    if(rq && htk){ joinRoomWith(normalizeRoomCode(rq), htk); return; }
-    if(rq && !(DB.settings.room && DB.settings.room.id)){ joinRoom(rq); return; }
+    if(rq){
+      rq=normalizeRoomCode(rq);
+      if(htk){
+        // 有 Token：自动开启双向同步（手机无需任何输入）
+        joinRoomWith(rq, htk);
+      } else {
+        // 无 Token：匿名只读载入，扫码即可见内容、可直接编辑（写入时再提示 Token）
+        anonPull(rq).then(function(remote){ applyRemoteReadOnly(remote, rq); })
+          .catch(function(err){ setRoomStatus('载入失败：'+(err&&err.message?err.message:err)); });
+      }
+      return;
+    }
   } catch(e){}
   if(DB.settings.room && DB.settings.room.id){
     var c=DB.settings.cloud;
