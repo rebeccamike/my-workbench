@@ -1102,7 +1102,7 @@ function createRoom(){
   if(!tk){ setRoomStatus('请先在上方粘贴你的 GitHub Token（只需一次）'); showToast('请先粘贴 GitHub Token'); return; }
   setRoomToken(tk);
   setRoomStatus('正在创建房间…');
-  var body = { description:'我的工作台同步房间', public:false, files:{ 'workbench.json':{ content: JSON.stringify(DB) } } };
+  var body = { description:'我的工作台同步房间', public:false, files:{ 'workbench.json':{ content: cloudPayload() } } };
   fetch(GIST_BASE, { method:'POST', headers:roomAuthH(), body:JSON.stringify(body) })
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){ roomActivate(d.id, tk); setRoomStatus('房间已创建 ✓ 用下方房间码或扫码让手机加入'); showToast('房间已创建'); })
@@ -1122,7 +1122,7 @@ function joinRoomWith(id, tk){
   fetch(roomGistUrl(id), { headers:roomAuthH() })
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(){ roomActivate(id, tk); try{ history.replaceState(null,'',location.pathname+'?room='+id); }catch(e){} setRoomStatus('已加入房间 ✓'); showToast('已加入房间'); })
-    .catch(function(err){ setRoomStatus('加入失败（房间码无效或网络异常）：'+(err&&err.message?err.message:err)); showToast('加入失败'); });
+    .catch(function(err){ var m=(err&&err.message)?err.message:(''+err); if(/401/.test(m)){ renderRoomRepair(id); setRoomStatus('加入失败：Token 已失效，请在下方重新粘贴 Token 后加入'); } else { setRoomStatus('加入失败（房间码无效或网络异常）：'+m); } showToast('加入失败'); });
 }
 
 function leaveRoom(){
@@ -1181,6 +1181,20 @@ function updateSyncPill(){
     el.textContent='本地模式';
   }
 }
+// 手机扫码自动加入失败（多为 Token 失效）时的兜底：直接在手机上粘贴 Token 重试，无需重新生成二维码
+function renderRoomRepair(id){
+  try{ if(typeof switchPage==='function') switchPage('settings'); }catch(e){}
+  var status=document.getElementById('roomStatus');
+  var box=document.getElementById('roomRepair');
+  if(!box && status && status.parentNode){
+    box=document.createElement('div'); box.id='roomRepair';
+    box.style.cssText='margin-top:12px;padding:12px;border:1px solid #e0b4b4;background:#fff5f5;border-radius:8px';
+    status.parentNode.insertBefore(box, status.nextSibling);
+  }
+  if(!box) return;
+  box.innerHTML='<div style="font-size:13px;color:#a33;margin-bottom:8px">⚠ 自动加入失败：扫码里的 Token 已失效或无权访问。请粘贴<b>同一个</b> GitHub Token（需 gist 权限），再点「加入」。电脑端也用这一个 Token 即可。</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><input class="form-control" id="roomRepairToken" type="password" placeholder="ghp_xxxxxxxxxxxx" style="max-width:240px"><button class="btn-primary" onclick="joinRoomWith(\''+id+'\', (document.getElementById(\'roomRepairToken\').value||\'\').trim())">用此 Token 加入</button></div>';
+}
 
 function roomBoot(){
   try {
@@ -1199,6 +1213,8 @@ function roomBoot(){
   renderRoom();
 }
 function gistHeaders(){ var c=DB.settings.cloud; var h={'Content-Type':'application/json','Accept':'application/vnd.github+json'}; if(c.key) h['Authorization']='Bearer '+c.key; return h; }
+// 同步上传时剥离 Token，绝不把 GitHub Token 写进 Gist（安全 + 避免被 secret scanning 吊销）
+function cloudPayload(){ var clone=JSON.parse(JSON.stringify(DB)); if(clone&&clone.settings&&clone.settings.cloud) delete clone.settings.cloud.key; return JSON.stringify(clone); }
 function fmtTime(ts){ var d=new Date(ts); function p(n){ return (n<10?'0':'')+n; } return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
 function fmtNow(){ return fmtTime(Date.now()); }
 function cloudUrl(){ var c=DB.settings.cloud; return GIST_BASE+'/'+c.bin; }
@@ -1221,7 +1237,7 @@ function pushCloud(){
   if(typeof fetch==='undefined'){ setCloudStatus('当前环境不支持网络同步'); return; }
   setCloudStatus('正在上传…');
   DB.updatedAt = Date.now();
-  fetch(cloudUrl(),{ method:'PATCH', headers:gistHeaders(), body:JSON.stringify({files:{'workbench.json':{content:JSON.stringify(DB)}}}) })
+  fetch(cloudUrl(),{ method:'PATCH', headers:gistHeaders(), body:JSON.stringify({files:{'workbench.json':{content:cloudPayload()}}}) })
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(){ DB.settings.cloud.lastSync=Date.now(); setCloudStatus('已同步到云端 · '+fmtNow()); })
     .catch(function(err){ setCloudStatus('上传失败：'+(err&&err.message?err.message:err)); });
@@ -1241,8 +1257,7 @@ function pullCloud(){
       var keepCloud = c;
       DB = remote;
       if(!DB.settings) DB.settings={};
-      if(!DB.settings.cloud || !DB.settings.cloud.bin) DB.settings.cloud = keepCloud;
-      else DB.settings.cloud.enabled = keepCloud.enabled;
+      DB.settings.cloud = keepCloud; // 始终保留本机 Token，不被远端（无 key）覆盖
       DB.updatedAt = remote.updatedAt || Date.now();
       persistOnly(); applyAll();
       setCloudStatus('已从云端更新 · '+fmtNow());
@@ -1268,7 +1283,7 @@ function createGist(){
   if(!c.key){ showToast('请先填写 GitHub Token'); return; }
   persistOnly();
   setCloudStatus('正在创建私密 Gist…');
-  var body={ description:'我的工作台数据备份', public:false, files:{'workbench.json':{content:JSON.stringify(DB)}} };
+  var body={ description:'我的工作台数据备份', public:false, files:{'workbench.json':{content:cloudPayload()}} };
   fetch(GIST_BASE,{ method:'POST', headers:gistHeaders(), body:JSON.stringify(body) })
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){
@@ -2063,7 +2078,8 @@ function download(content, filename) {
 function saveFile() {
   try {
     // 转义用户数据中的结束脚本标签，避免破坏生成的 HTML
-    var dbJson = JSON.stringify(DB).replace(/<\//g, '<\\/');
+    var _safe = JSON.parse(JSON.stringify(DB)); if(_safe.settings && _safe.settings.cloud) delete _safe.settings.cloud.key;
+    var dbJson = JSON.stringify(_safe).replace(/<\//g, '<\\/');
     var html = document.documentElement.outerHTML;
     var seedTag = '<script id="appSeed">window.__SEED__=' + dbJson + ';<\/script>';
     html = html.replace(/<script id="appSeed">[\s\S]*?<\/script>/, '');
