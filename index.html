@@ -1161,7 +1161,7 @@ function leaveRoom(){
 }
 function copyRoomCode(){
   var id=DB.settings.room&&DB.settings.room.id; if(!id){ showToast('请先创建房间'); return; }
-  var txt=id;
+  var txt=window.__lastRoomURL||id;
   try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ showToast('房间码已复制'); }, function(){ fallbackCopy(txt); }); return; } }catch(e){}
   fallbackCopy(txt);
 }
@@ -1177,7 +1177,9 @@ function renderRoom(){
   if(id){
     var grouped=id.replace(/(.{4})/g,'$1 ').trim().toUpperCase();
     var tk=getRoomToken();
-    var url=location.origin+location.pathname+'?room='+id+(tk?('&tk='+encodeURIComponent(tk)):'')+(tk?('#tk='+encodeURIComponent(tk)):'');
+    var syncCode = (id && tk) ? b64urlEncode(id+'|'+tk) : '';
+    var url = location.origin+location.pathname + (syncCode ? ('?r='+encodeURIComponent(syncCode)) : ('?room='+id));
+    window.__lastRoomURL = url;
     var qr='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url);
     if(view) view.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">'+
       '<div style="text-align:center"><div style="font-size:12px;color:#888;margin-bottom:4px">手机扫码加入</div><img src="'+qr+'" style="width:150px;height:150px;border:1px solid #ddd;border-radius:8px" onerror="this.style.display=\'none\'"></div>'+
@@ -1232,11 +1234,23 @@ function renderRoomRepair(id){
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><input class="form-control" id="roomRepairToken" type="password" placeholder="ghp_xxxxxxxxxxxx" style="max-width:240px"><button class="btn-primary" onclick="joinRoomWith(\''+id+'\', (document.getElementById(\'roomRepairToken\').value||\'\').trim())">用此 Token 加入</button></div>';
 }
 
+function b64urlEncode(s){ try{ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }catch(e){ return ''; } }
+function b64urlDecode(s){ try{ s=(s||'').replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }catch(e){ return ''; } }
 function roomBoot(){
   try {
     var params=new URLSearchParams(location.search);
+    // 新格式：单一 r 参数 = base64url(roomId|token)，扫码 APP 不会丢核心数据
+    var rcode=params.get('r');
+    if(rcode){
+      try{
+        var dec=b64urlDecode(rcode); var sep=dec.indexOf('|');
+        if(sep>0){ var rid=normalizeRoomCode(dec.slice(0,sep)); var rtk=dec.slice(sep+1);
+          if(rid){ if(rtk){ joinRoomWith(rid, rtk); } else { anonPull(rid).then(function(rm){ applyRemoteReadOnly(rm, rid); }).catch(function(err){ setRoomStatus('载入失败：'+(err&&err.message?err.message:err)); }); } return; }
+        }
+      }catch(e){}
+    }
     var rq=params.get('room');
-    var htk=params.get('tk')||''; // 优先读查询参数（多数扫码 APP 不会丢）
+    var htk=params.get('tk')||''; // 兼容旧格式
     if(!htk){ var hm=new URLSearchParams((location.hash||'').replace(/^#/,'')); htk=hm.get('tk')||''; }
     if(rq){
       rq=normalizeRoomCode(rq);
