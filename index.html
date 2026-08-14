@@ -61,6 +61,14 @@ a{color:inherit;text-decoration:none}
 .pill.warn{color:#C9651F;border-color:#F2D9C4;background:#FDF3EA}
 .pill.warn.on{border-color:#C9651F;background:#FDF1E8}
 .pill.warn .dot{background:#C9651F}
+.pill.sync .dot{background:#9aa0a6}
+.pill.sync.syncing{color:#9a7400;border-color:#F2E3B0;background:#FCF6E3}
+.pill.sync.syncing .dot{background:#E0A100;animation:blink 1s infinite}
+.pill.sync.ok{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.pill.sync.ok .dot{background:var(--primary)}
+.pill.sync.err{border-color:#D64545;color:#D64545;background:#FDECEC}
+.pill.sync.err .dot{background:#D64545}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 .content{flex:1;padding:6px 28px 32px;overflow-y:auto}
 .content h1.page-title{font-size:20px;font-weight:600;margin:4px 0 16px}
@@ -373,6 +381,7 @@ select.form-control{cursor:pointer}
   <div class="topbar">
     <div class="topbar-date" id="topbarDate">7月30日 周四</div>
     <div class="topbar-actions">
+      <button class="pill sync" id="pillSync" data-action="openSync" title="点击查看/设置同步"><span class="dot"></span><span id="syncPillText">本地模式</span></button>
       <button class="pill" id="pillPrivacy"><span class="dot"></span>隐私</button>
       <button class="pill warn" id="pillKeyb"><span class="dot"></span>键盘</button>
     </div>
@@ -1122,6 +1131,13 @@ function leaveRoom(){
   DB.settings.room=null;
   persistOnly(); renderRoom(); setRoomStatus('已退出房间');
 }
+function copyRoomCode(){
+  var id=DB.settings.room&&DB.settings.room.id; if(!id){ showToast('请先创建房间'); return; }
+  var txt=id;
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ showToast('房间码已复制'); }, function(){ fallbackCopy(txt); }); return; } }catch(e){}
+  fallbackCopy(txt);
+}
+function fallbackCopy(t){ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); showToast('房间码已复制'); }catch(e){ showToast('复制失败，请手动记录房间码'); } document.body.removeChild(ta); }
 
 function renderRoom(){
   var id = DB.settings.room && DB.settings.room.id;
@@ -1133,11 +1149,12 @@ function renderRoom(){
   if(id){
     var grouped=id.replace(/(.{4})/g,'$1 ').trim().toUpperCase();
     var tk=getRoomToken();
-    var url=location.origin+location.pathname+'?room='+id+(tk?('#tk='+encodeURIComponent(tk)):'');
+    var url=location.origin+location.pathname+'?room='+id+(tk?('&tk='+encodeURIComponent(tk)):'')+(tk?('#tk='+encodeURIComponent(tk)):'');
     var qr='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url);
     if(view) view.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">'+
       '<div style="text-align:center"><div style="font-size:12px;color:#888;margin-bottom:4px">手机扫码加入</div><img src="'+qr+'" style="width:150px;height:150px;border:1px solid #ddd;border-radius:8px" onerror="this.style.display=\'none\'"></div>'+
-      '<div><div style="font-size:12px;color:#888;margin-bottom:4px">房间码（也可手动输入）</div><div style="font-family:monospace;font-size:15px;letter-spacing:2px;background:#f5f5f5;padding:8px 12px;border-radius:6px">'+grouped+'</div></div></div>';
+      '<div><div style="font-size:12px;color:#888;margin-bottom:4px">房间码（也可手动输入）</div><div style="font-family:monospace;font-size:15px;letter-spacing:2px;background:#f5f5f5;padding:8px 12px;border-radius:6px">'+grouped+'</div>'+
+      '<button class="btn-outline" id="roomCopyBtn" style="margin-top:8px;font-size:12px" onclick="copyRoomCode()">📋 复制房间码</button></div></div>';
     if(cb) cb.style.display='none';
     if(jw) jw.style.display='none';
     if(lb) lb.style.display='inline-block';
@@ -1147,14 +1164,30 @@ function renderRoom(){
     if(jw) jw.style.display='flex';
     if(lb) lb.style.display='none';
   }
+  updateSyncPill();
+}
+
+function updateSyncPill(){
+  var el=document.getElementById('syncPillText'); var pill=document.getElementById('pillSync');
+  if(!el||!pill) return;
+  pill.classList.remove('ok','err','syncing');
+  var c=DB.settings.cloud||{}, room=DB.settings.room||{};
+  if(c.enabled && c.bin){
+    if(c.lastSync){ el.textContent='已同步 ✓'; pill.classList.add('ok'); }
+    else { el.textContent='同步中…'; pill.classList.add('syncing'); }
+  } else if(room && room.id){
+    el.textContent='需连接'; pill.classList.add('err');
+  } else {
+    el.textContent='本地模式';
+  }
 }
 
 function roomBoot(){
   try {
     var params=new URLSearchParams(location.search);
     var rq=params.get('room');
-    var hm=new URLSearchParams((location.hash||'').replace(/^#/,''));
-    var htk=hm.get('tk')||'';
+    var htk=params.get('tk')||''; // 优先读查询参数（多数扫码 APP 不会丢）
+    if(!htk){ var hm=new URLSearchParams((location.hash||'').replace(/^#/,'')); htk=hm.get('tk')||''; }
     if(rq && htk){ joinRoomWith(normalizeRoomCode(rq), htk); return; }
     if(rq && !(DB.settings.room && DB.settings.room.id)){ joinRoom(rq); return; }
   } catch(e){}
@@ -1173,7 +1206,7 @@ function setCloudStatus(msg){
   DB.settings.cloud.status=msg;
   var el=document.getElementById('cloudStatus'); if(el) el.textContent=msg;
   var t=document.getElementById('cloudLast'); if(t) t.textContent = DB.settings.cloud.lastSync?('上次同步：'+fmtTime(DB.settings.cloud.lastSync)):'';
-  persistOnly();
+  persistOnly(); updateSyncPill();
 }
 function readCloudForm(){
   var c=DB.settings.cloud;
@@ -1977,6 +2010,9 @@ document.addEventListener('click', function (e) {
       var cPush = readCloudForm();
       if (!cPush.bin || !cPush.key) showToast('请先填写 Bin ID 与 API Key');
       else pushCloud();
+    } else if (a === 'openSync') {
+      switchPage('settings');
+      showToast('在「房间同步」面板粘贴 Token，再创建或加入房间');
     } else if (a === 'cloudPull') {
       var cPull = readCloudForm();
       if (!cPull.bin || !cPull.key) showToast('请先填写 Gist ID 与 Token');
